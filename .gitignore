@@ -1,0 +1,6 @@
+tools/
+build/
+docs/
+plan/
+tests/
+__pycache__/
