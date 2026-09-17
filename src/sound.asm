@@ -248,7 +248,9 @@ sound_service:
 
 sound_tick:
     cmp byte [sound_done], 0
-    jne .return
+    je .active
+    ret
+.active:
     mov ax, [music_row]
     mov bx, 7
     mul bx

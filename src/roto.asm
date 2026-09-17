@@ -1,4 +1,4 @@
-; PC-9801 normal-resolution DOS .COM. NASM; strictly 8086 instructions.
+; PC-98 normal/high-resolution DOS .COM. NASM; strictly 8086 instructions.
 bits 16
 cpu 8086
 org 100h
@@ -25,7 +25,17 @@ start:
     jcxz .init
     lodsb
     cmp al, '?'
-    je help
+    jne .not_help
+    jmp help
+.not_help:
+    cmp al, '2'
+    jne .eight_arg
+    mov byte [want256], 1
+.eight_arg:
+    cmp al, '8'
+    jne .letter_arg
+    mov byte [want256], 0
+.letter_arg:
     and al, 0dfh
     cmp al, 'S'
     jne .test_arg
@@ -45,31 +55,28 @@ start:
 .next_arg:
     loop .args
 .init:
-    mov ah, 41h
-    int 18h                     ; graphics off while initializing
-    mov ah, 42h
-    mov ch, 0c0h
-    int 18h                     ; 640 x 400, color, page zero
+    call video_detect
+    jc .video_error
+    call video_setup
+    jnc .video_ok
+.video_error:
+    mov dx, unsupported_text
+    mov ah, 09h
+    int 21h
+    mov ax, 4c01h
+    int 21h
+.video_ok:
     mov ah, 0dh
     int 18h                     ; hide text, retain text RAM and cursor
     push cs
     pop ds
-    xor al, al
-    out 6ah, al                  ; digital eight-color mode
-    out 7ch, al                  ; disable GRCG (also bypasses EGC)
-    out 0a4h, al
-    out 0a6h, al
-    call palette
-    call clear_page
-    cmp byte [single_page], 0
-    jne .show
-    mov al, 1
-    out 0a6h, al
-    call clear_page
-    mov byte [draw_page], 1
+    call video_init
 .show:
-    mov ah, 40h
-    int 18h
+    call video_show
+    jnc .sound
+    mov byte [exit_code], 1
+    jmp quit
+.sound:
     push cs
     pop ds
     call sound_init
@@ -77,6 +84,8 @@ frame:
     call setup_transform
     call render
     call wait_vsync
+    cmp byte [hireso], 0
+    jne .no_flip
     mov al, [draw_page]
     out 0a4h, al
     cmp byte [single_page], 0
@@ -105,16 +114,15 @@ frame:
     jne frame
 quit:
     call sound_stop
-    mov ah, 41h
-    int 18h
-    xor al, al
-    out 7ch, al
-    out 0a4h, al
-    out 0a6h, al
+    call video_hide
+    push cs
+    pop ds
+    call video_stop
     mov ah, 0ch
     int 18h                     ; restore DOS text visibility
     call sound_report
     mov ax, 4c00h
+    mov al, [exit_code]
     int 21h
 help:
     mov dx, help_text
@@ -190,7 +198,12 @@ setup_transform:
 %endmacro
 
 render:
+    cmp byte [want256], 0
+    je .planar
+    jmp render256
+.planar:
     mov word [vram_row], 0
+    mov word [hirow_seg], 0c5fdh ; (175*140+30) / 16 + C000h
     mov bp, 100
 .row:
     call sound_service           ; music time independent of graphics frame count
@@ -221,24 +234,48 @@ render:
     dec bp
     jnz .pair
     mov ax, 0a800h
+    mov byte [plane_mask], 0eh
     mov si, row_b
     call copy_row
     mov ax, 0b000h
+    mov byte [plane_mask], 0dh
     mov si, row_r
     call copy_row
     mov ax, 0b800h
+    mov byte [plane_mask], 0bh
     mov si, row_g
     call copy_row
     add word [vram_row], 320
+    add word [hirow_seg], 35     ; four 140-byte scanlines
     mov ax, [dv]
     sub [row_u], ax
     mov ax, [du]
     add [row_v], ax
     pop bp
     dec bp
-    jnz .row
+    jz .done
+    jmp .row
+.done:
     ret
 copy_row:
+    cmp byte [hireso], 0
+    je .normal
+    mov ax, [hirow_seg]
+    mov es, ax
+    mov al, [plane_mask]
+    out 0a4h, al
+    mov di, 2
+    mov dx, 4
+.hi_line:
+    push si
+    mov cx, 40
+    rep movsw
+    pop si
+    add di, 60
+    dec dx
+    jnz .hi_line
+    ret
+.normal:
     mov es, ax
     mov di, [vram_row]
     mov dx, 4
@@ -279,9 +316,12 @@ vram_row dw 0
 remaining dw 0
 draw_page db 0
 single_page db 0
-help_text db 'ROTO - PC-9801 640x400 / 8 colors',13,10
+exit_code db 0
+help_text db 'ROTO - PC-98 normal / high-resolution, GRCG / EGC / PEGC',13,10
+          db '/256: PEGC 256 colors. /8: compatible 8 colors (default).',13,10
           db 'Esc/Q: quit. /S: single page. /T: 16 frames. /M: mute.',13,10
           db '/P: 12.8s music preview. Auto 26K/86 FM+SSG, 86 PCM.',13,10,'$'
+%include "video.asm"
 %include "assets.inc"
 %include "sound.asm"
 row_b times 80 db 0

@@ -10,6 +10,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Asset generation failed' }
     & $Python src/make_music.py
     if ($LASTEXITCODE -ne 0) { throw 'Music generation failed' }
+    & $Python src/make_asw.py
+    if ($LASTEXITCODE -ne 0) { throw 'ASW source generation failed' }
     New-Item -ItemType Directory -Force build | Out-Null
     & $Nasm -f bin -Wall -w-reloc-abs-word -Werror -I src/ -l build/roto.lst src/roto.asm -o ROTO.com
     if ($LASTEXITCODE -ne 0) { throw 'NASM assembly failed' }

@@ -36,6 +36,10 @@ def generate():
     emit('transforms', coefficients, 'dw')
     emit('tex_rows', [(i & 63) * 64 for i in range(256)], 'dw')
     emit('texture', [texture_pixel(x, y) for y in range(64) for x in range(64)])
+    # A full 256-entry B3/R3/G2 colour cube, with a tiled diagonal gradient.
+    emit('texture256', [((x // 8) | ((y // 8) << 3) |
+                         (((x + y) // 4 & 3) << 6))
+                        for y in range(64) for x in range(64)])
     for name, bit in [('b', 1), ('r', 2), ('g', 4)]:
         emit('lut_' + name, [(240 if (i >> 3) & bit else 0) |
                             (15 if i & bit else 0) for i in range(64)])
