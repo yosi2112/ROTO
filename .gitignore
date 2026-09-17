@@ -1,6 +1,6 @@
 tools/
 build/
-plan/*/temp/
+docs/
+plan/
+tests/
 __pycache__/
-src/asw/*.lst
-src/asw/*.p
