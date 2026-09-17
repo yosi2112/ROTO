@@ -1,5 +1,5 @@
 # ws003p002
-Status: in-progress
+Status: cleared
 Scope: quality and convention verification, tests, documentation, reproducibility.
 Depends: ws003p001.
 Commands: build.ps1; build-asw.ps1; tests/verify.py; tests/verify_sound.py;
@@ -12,3 +12,5 @@ must remain explicitly unverified, rather than counted as passing tests.
 
 ## Execution Log
 
+
+2026-09-17: Passed 8 visual + 14 audio + 26 backend cases for each binary (96 total), four DOSBox-X smoke markers, deterministic rebuild of both COM files and generated ASW source, Python syntax and source whitespace checks. Implementation checkpoint ba42ebe. See docs/verification-q003.md. Physical hardware and high-resolution ROM execution remain explicitly unverified.
